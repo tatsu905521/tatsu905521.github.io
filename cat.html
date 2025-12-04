@@ -2,161 +2,161 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>小貓吃東西遊戲</title>
+<title>小貓吃食物遊戲</title>
 <style>
-    body, html {
+    body {
         margin: 0;
-        padding: 0;
         overflow: hidden;
         background: #fcefe6;
     }
     canvas {
         display: block;
+        margin: 0 auto;
+        background: #fff7f0;
     }
 </style>
 </head>
 <body>
 
-<canvas id="game"></canvas>
+<canvas id="gameCanvas"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
+// === 遊戲畫布 ===
+const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// 讓 canvas 自動變成全螢幕
-function resizeCanvas() {
+// 手機直向為主，但電腦也能玩
+function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", resize);
+resize();
 
-// ==========================
-//        遊戲參數設定
-// ==========================
+// === 小貓設定 ===
+const catImg = new Image();
+catImg.src = "cat.png";  // ← 你的小貓圖片放這
+
 let cat = {
     x: canvas.width / 2,
-    y: canvas.height - 120,
-    width: 120,
-    height: 120,
-    speed: 18   // ★ 提升小貓移動速度（原本較慢）
+    y: canvas.height - 150,
+    size: 120,
+    speed: 15 // ← 已加快
 };
 
-let foods = [];
+// === 遊戲狀態 ===
 let score = 0;
-let life = 1;     // ★ 生命值改成 1
-let fallSpeed = 3;
-let spawnRate = 350; // ★ 更高密度（數字越小生成越快）
-let lastSpawn = 0;
+let life = 1; // ← 生命一次
+let foodList = [];
+let foodSpeed = 3; // 初始速度
+let spawnRate = 20; // 食物密度（數字越小越密）
+let frame = 0;
 
-// 甜食與不能吃的東西
-const sweetFoods = ["🍰", "🍩", "🧁", "🍪"];
-const badFoods = ["🗑️", "💀", "☢"];
-
-// ==========================
-//      生成食物
-// ==========================
+// === 生成食物 ===
 function spawnFood() {
-    let type = Math.random() < 0.75 ? "good" : "bad"; // 甜食 75%
-    let emoji = type === "good" 
-        ? sweetFoods[Math.floor(Math.random() * sweetFoods.length)]
-        : badFoods[Math.floor(Math.random() * badFoods.length)];
-
-    foods.push({
-        x: Math.random() * (canvas.width - 50),
-        y: -60,
+    const isGood = Math.random() > 0.35;
+    foodList.push({
+        x: Math.random() * (canvas.width - 40),
+        y: -40,
         size: 50,
-        type: type,
-        emoji: emoji
+        speed: foodSpeed,
+        good: isGood
     });
 }
 
-// ==========================
-//      小貓移動控制
-// ==========================
-document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowLeft") {
-        cat.x -= cat.speed;
-    } else if (e.key === "ArrowRight") {
-        cat.x += cat.speed;
+// === 食物繪製 ===
+function drawFood() {
+    for (let f of foodList) {
+        ctx.fillStyle = f.good ? "#ff7eb3" : "#444";
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.size/2, 0, Math.PI * 2);
+        ctx.fill();
     }
+}
 
-    // 邊界限制
-    cat.x = Math.max(0, Math.min(canvas.width - cat.width, cat.x));
-});
+// === 移動 + 碰撞 ===
+function updateFood() {
+    for (let i = foodList.length - 1; i >= 0; i--) {
+        let f = foodList[i];
+        f.y += f.speed;
 
-// ==========================
-//      主遊戲迴圈
-// ==========================
-function gameLoop(timestamp) {
+        // 碰到小貓
+        if (Math.abs(f.x - cat.x) < cat.size/2 &&
+            Math.abs(f.y - cat.y) < cat.size/2) {
 
-    // 清空畫面
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 自動生成食物
-    if (timestamp - lastSpawn > spawnRate) {
-        spawnFood();
-        lastSpawn = timestamp;
-        fallSpeed += 0.03; // ★ 隨時間加快落下速度
-    }
-
-    // 繪製小貓
-    ctx.font = `${cat.width}px serif`;
-    ctx.fillText("🐱", cat.x, cat.y);
-
-    // 更新食物位置
-    for (let i = foods.length - 1; i >= 0; i--) {
-        let f = foods[i];
-        f.y += fallSpeed;
-
-        // 繪製食物
-        ctx.font = `${f.size}px serif`;
-        ctx.fillText(f.emoji, f.x, f.y);
-
-        // 碰撞判定
-        if (
-            f.y + f.size > cat.y &&
-            f.y < cat.y + cat.height &&
-            f.x + f.size > cat.x &&
-            f.x < cat.x + cat.width
-        ) {
-            if (f.type === "good") {
-                score += 100; // ★ 甜食 +100
+            if (f.good) {
+                score += 100;
             } else {
                 life -= 1;
             }
-            foods.splice(i, 1);
+            foodList.splice(i, 1);
+            continue;
         }
 
         // 超出畫面移除
-        if (f.y > canvas.height + 100) {
-            foods.splice(i, 1);
+        if (f.y > canvas.height + 50) {
+            foodList.splice(i, 1);
         }
     }
+}
 
-    // UI：分數 & 生命
-    ctx.font = "30px Arial";
-    ctx.fillStyle = "#000";
-    ctx.fillText(`Score: ${score}`, 20, 40);
-    ctx.fillText(`Life: ${life}`, 20, 80);
+// === 小貓繪製 ===
+function drawCat() {
+    ctx.drawImage(catImg, cat.x - cat.size/2, cat.y - cat.size/2, cat.size, cat.size);
+}
 
-    // Game Over
+// === UI ===
+function drawUI() {
+    ctx.fillStyle = "#333";
+    ctx.font = "28px sans-serif";
+    ctx.fillText("分數: " + score, 20, 40);
+    ctx.fillText("生命: " + life, 20, 80);
+}
+
+// === 主迴圈 ===
+function gameLoop() {
     if (life <= 0) {
-        ctx.font = "60px Arial";
-        ctx.fillStyle = "red";
-        ctx.fillText("Game Over", canvas.width / 2 - 150, canvas.height / 2);
+        ctx.fillStyle = "#000";
+        ctx.font = "50px sans-serif";
+        ctx.fillText("遊戲結束！分數：" + score, canvas.width/2 - 150, canvas.height/2);
         return;
     }
 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 每 15 frame 掉落一次
+    if (frame % spawnRate === 0) {
+        spawnFood();
+    }
+
+    // 加速
+    if (frame % 300 === 0) {
+        foodSpeed += 0.4;
+        cat.speed += 1;
+        if (spawnRate > 8) spawnRate -= 1;
+    }
+
+    updateFood();
+    drawFood();
+    drawCat();
+    drawUI();
+
+    frame++;
     requestAnimationFrame(gameLoop);
 }
-
 requestAnimationFrame(gameLoop);
+
+// === 電腦鍵盤控制 ===
+document.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") cat.x -= cat.speed;
+    if (e.key === "ArrowRight") cat.x += cat.speed;
+});
+
+// === 手機觸控控制 ===
+document.addEventListener("touchmove", e => {
+    cat.x = e.touches[0].clientX;
+});
 </script>
-
-</body>
-</html>
-
 
 </body>
 </html>
