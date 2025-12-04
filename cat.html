@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>小貓接食物</title>
+  <style>
+    :root{
+      --bg:#f7f3ff;
+      --panel:#ffffff;
+      --accent:#6b46c1;
+      --text:#222;
+      --danger:#ff4d6d;
+      --ok:#3ab07a;
+    }
+    html,body{height:100%;margin:0;font-family:Inter, "Noto Sans TC", system-ui, -apple-system, "Segoe UI", Roboto;}
+    body{background:linear-gradient(180deg,var(--bg),#fff);display:flex;align-items:center;justify-content:center;padding:20px;color:var(--text);}
+    .wrap{width:360px;max-width:95vw;background:var(--panel);box-shadow:0 8px 30px rgba(20,20,40,0.08);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+    header{display:flex;justify-content:space-between;align-items:center}
+    h1{font-size:16px;margin:0}
+    .hud{display:flex;gap:10px;align-items:center}
+    .score{font-weight:700}
+    .hearts{display:flex;gap:6px;align-items:center}
+    .heart{width:22px;height:22px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;background:var(--danger);color:white;font-size:14px}
+    canvas{background:linear-gradient(#eaf6ff,#cce7ff);border-radius:8px;display:block;width:100%;height:420px}
+    .controls{display:flex;gap:8px;justify-content:center;margin-top:6px}
+    .btn{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .small{font-size:13px;background:#eee;color:#333}
+    .overlay{position:relative}
+    .game-over{
+      position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.45));
+      color:white;border-radius:8px;font-weight:700;backdrop-filter: blur(2px);
+    }
+    .hint{font-size:13px;color:#666;margin-top:4px}
+    .touch-controls{display:flex;gap:12px}
+    .touch-btn{width:56px;height:40px;border-radius:8px;background:#fff8;border:1px solid #0000;padding:6px;display:flex;align-items:center;justify-content:center;user-select:none}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="小貓接食物遊戲">
+    <header>
+      <h1>小貓接食物 🐱🍰</h1>
+      <div class="hud">
+        <div class="score">Score: <span id="score">0</span></div>
+        <div class="hearts" aria-hidden="true">
+          <div class="heart" id="h1">❤</div>
+          <div class="heart" id="h2">❤</div>
+          <div class="heart" id="h3">❤</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="overlay">
+      <canvas id="game" width="360" height="420"></canvas>
+
+      <!-- Game over panel -->
+      <div id="gameOver" class="game-over" style="display:none">
+        <div style="font-size:28px">Game Over</div>
+        <div style="margin-top:8px">最後得分：<span id="finalScore">0</span></div>
+        <button id="restartBtn" class="btn" style="margin-top:12px">重新開始</button>
+        <div class="hint">按方向鍵 ← → 控制 / 手機點按左右鍵</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="hint">甜食 +100 分，碰到壞物扣 1 命（3 命結束）</div>
+      <div style="font-size:12px;color:#666">速度會逐漸加快</div>
+    </div>
+
+    <div class="controls" aria-hidden="true">
+      <button id="startBtn" class="btn">開始遊戲</button>
+      <button id="pauseBtn" class="btn small">暫停</button>
+      <div class="touch-controls" style="margin-left:6px">
+        <div id="leftTouch" class="touch-btn">◀</div>
+        <div id="rightTouch" class="touch-btn">▶</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  小貓接食物遊戲 (Canvas)
+  - 方向鍵控制小貓左右
+  - 甜食: +100 分 (使用 emoji 🍰 🍩 🍪)
+  - 壞東西: 扣命 (使用 emoji 🪨 🗑️ 或 🌶️)
+  - 初始生命 = 3
+  - 食物掉落速度與生成頻率會隨時間增加
+  - 可暫停、重新開始、手機觸控左/右
+*/
+
+(() => {
+  // DOM
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const finalScoreEl = document.getElementById('finalScore');
+  const gameOverPanel = document.getElementById('gameOver');
+  const restartBtn = document.getElementById('restartBtn');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const leftTouch = document.getElementById('leftTouch');
+  const rightTouch = document.getElementById('rightTouch');
+  const heartEls = [document.getElementById('h1'), document.getElementById('h2'), document.getElementById('h3')];
+
+  // Game state
+  let width = canvas.width;
+  let height = canvas.height;
+  let score = 0;
+  let lives = 3;
+  let running = false;
+  let lastTime = 0;
+  let spawnTimer = 0;
+  let spawnInterval = 900; // ms initial
+  let difficultyTime = 0; // time elapsed to increase difficulty
+  let items = [];
+  let speedMultiplier = 1;
+  let keys = { left:false, right:false };
+
+  // Player (小貓)
+  const player = {
+    x: width/2 - 28,
+    y: height - 70,
+    w: 56,
+    h: 56,
+    speed: 260, // pixels per second
+    emoji: '🐱',
+    draw() {
+      // draw cat as emoji centered
+      ctx.save();
+      ctx.font = '44px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.emoji, this.x + this.w/2, this.y + this.h/2 + 4);
+      ctx.restore();
+    }
+  };
+
+  // Item types
+  const sweetEmojis = ['🍰','🍩','🍪','🧁'];
+  const badEmojis = ['🪨','🌶️','🗑️'];
+  // Probability: sweet 70%, bad 30%
+
+  function spawnItem(){
+    const isSweet = Math.random() < 0.7;
+    const emoji = isSweet ? sweetEmojis[Math.floor(Math.random()*sweetEmojis.length)]
+                          : badEmojis[Math.floor(Math.random()*badEmojis.length)];
+    // Spawn at random x
+    const size = 34 + Math.random()*10; // for visual variety
+    const x = Math.random()*(width - size);
+    const y = -size;
+    // speed depends on base + multiplier
+    const baseSpeed = 80 + Math.random()*40; // px/s
+    const item = { x, y, size, emoji, sweet: isSweet, speed: baseSpeed * speedMultiplier };
+    items.push(item);
+  }
+
+  function update(delta){
+    if(!running) return;
+
+    // Increase difficulty gradually
+    difficultyTime += delta;
+    if(difficultyTime > 20000){ // every 20s
+      difficultyTime = 0;
+      speedMultiplier *= 1.12; // increase speed
+      spawnInterval = Math.max(300, spawnInterval * 0.88); // spawn more frequently
+    }
+
+    // spawn logic
+    spawnTimer += delta;
+    if(spawnTimer >= spawnInterval){
+      spawnTimer = 0;
+      spawnItem();
+    }
+
+    // update player movement
+    const move = player.speed * (delta/1000);
+    if(keys.left) player.x -= move;
+    if(keys.right) player.x += move;
+    // bounds
+    player.x = Math.max(0, Math.min(width - player.w, player.x));
+
+    // update items
+    for(let i = items.length-1; i >= 0; i--){
+      const it = items[i];
+      // each frame speed slightly scales with global multiplier so update per frame
+      it.y += (it.speed + (20 * speedMultiplier)) * (delta/1000);
+      // collision detect rect-circle approximated with bounding box
+      if(hitTest(player, it)){
+        // collision
+        if(it.sweet){
+          score += 100;
+        } else {
+          lives -= 1;
+          updateHearts();
+          if(lives <= 0){
+            gameOver();
+          }
+        }
+        items.splice(i,1);
+        scoreEl.textContent = score;
+        continue;
+      }
+      // remove if out of screen
+      if(it.y > height + 40){
+        items.splice(i,1);
+      }
+    }
+  }
+
+  function hitTest(player, item){
+    // treat item as rectangle of size item.size
+    const ix = item.x, iy = item.y, iw = item.size, ih = item.size;
+    const px = player.x, py = player.y, pw = player.w, ph = player.h;
+    return !(px > ix + iw || px + pw < ix || py > iy + ih || py + ph < iy);
+  }
+
+  function draw(){
+    // clear
+    ctx.clearRect(0,0,width,height);
+    // background simple grid or gradient already in css; draw ground
+    // draw items
+    for(const it of items){
+      ctx.save();
+      ctx.font = `${Math.floor(it.size)}px serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(it.emoji, it.x, it.y);
+      ctx.restore();
+    }
+    // draw player
+    player.draw();
+  }
+
+  function loop(ts){
+    if(!lastTime) lastTime = ts;
+    const delta = ts - lastTime;
+    lastTime = ts;
+    update(delta);
+    draw();
+    if(running) requestAnimationFrame(loop);
+  }
+
+  // controls
+  window.addEventListener('keydown', (e)=>{
+    if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+    if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+    if(e.key === ' '){
+      // space to pause/resume
+      togglePause();
+    }
+  });
+  window.addEventListener('keyup', (e)=>{
+    if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+  });
+
+  // touch buttons for mobile
+  leftTouch.addEventListener('touchstart', (e)=>{ e.preventDefault(); keys.left = true; });
+  leftTouch.addEventListener('touchend', (e)=>{ e.preventDefault(); keys.left = false; });
+  rightTouch.addEventListener('touchstart', (e)=>{ e.preventDefault(); keys.right = true; });
+  rightTouch.addEventListener('touchend', (e)=>{ e.preventDefault(); keys.right = false; });
+
+  // Start / Pause / Restart
+  startBtn.addEventListener('click', ()=>{
+    if(!running) startGame();
+  });
+  pauseBtn.addEventListener('click', togglePause);
+  restartBtn.addEventListener('click', restartGame);
+
+  function startGame(){
+    // reset state
+    score = 0;
+    lives = 3;
+    items = [];
+    spawnInterval = 900;
+    speedMultiplier = 1;
+    difficultyTime = 0;
+    spawnTimer = 0;
+    lastTime = 0;
+    updateHearts();
+    scoreEl.textContent = score;
+    gameOverPanel.style.display = 'none';
+    running = true;
+    requestAnimationFrame(loop);
+  }
+
+  function togglePause(){
+    running = !running;
+    if(running){
+      lastTime = 0;
+      requestAnimationFrame(loop);
+      pauseBtn.textContent = '暫停';
+    } else {
+      pauseBtn.textContent = '繼續';
+    }
+  }
+
+  function restartGame(){
+    startGame();
+  }
+
+  function updateHearts(){
+    for(let i=0;i<3;i++){
+      if(i < lives){
+        heartEls[i].style.visibility = 'visible';
+      } else {
+        heartEls[i].style.visibility = 'hidden';
+      }
+    }
+  }
+
+  function gameOver(){
+    running = false;
+    finalScoreEl.textContent = score;
+    gameOverPanel.style.display = 'flex';
+  }
+
+  // Responsive canvas scaling for display while keeping internal resolution
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    // scale internal canvas to desired game resolution but keep CSS size responsive
+    // internal width/height are fixed to 360x420 for gameplay consistency
+    // update drawing related sizes if needed
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // initialize UI
+  updateHearts();
+  scoreEl.textContent = score;
+  // show hint to press start if desired
+})();
+</script>
+</body>
+</html>
