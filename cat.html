@@ -1,150 +1,162 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>小貓接食物遊戲</title>
+<title>小貓吃東西遊戲</title>
 <style>
-    html, body {
+    body, html {
         margin: 0;
         padding: 0;
         overflow: hidden;
-        height: 100%;
-        background: #f8f3ff;
-        font-family: Arial, sans-serif;
-        user-select: none;
+        background: #fcefe6;
     }
-
     canvas {
         display: block;
-        background: linear-gradient(#fcefff, #e6d7ff);
-    }
-
-    #ui {
-        position: fixed;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: #333;
-        font-size: 24px;
-        font-weight: bold;
-        text-shadow: 0 0 5px #fff;
     }
 </style>
 </head>
 <body>
 
-<div id="ui">分數：0　|　生命：3</div>
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// --------- 全螢幕尺寸設定 ---------
-function resize() {
+// 讓 canvas 自動變成全螢幕
+function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
-resize();
-window.addEventListener("resize", resize);
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
 
-// --------- 小貓設定 ---------
-const cat = {
+// ==========================
+//        遊戲參數設定
+// ==========================
+let cat = {
     x: canvas.width / 2,
     y: canvas.height - 120,
-    size: 80,
-    speed: 15
+    width: 120,
+    height: 120,
+    speed: 18   // ★ 提升小貓移動速度（原本較慢）
 };
 
-// --------- 遊戲資料 ---------
-let score = 0;
-let life = 3;
 let foods = [];
+let score = 0;
+let life = 1;     // ★ 生命值改成 1
 let fallSpeed = 3;
-let frameCount = 0;
+let spawnRate = 350; // ★ 更高密度（數字越小生成越快）
+let lastSpawn = 0;
 
-// --------- 食物生成 ---------
+// 甜食與不能吃的東西
+const sweetFoods = ["🍰", "🍩", "🧁", "🍪"];
+const badFoods = ["🗑️", "💀", "🪨"];
+
+// ==========================
+//      生成食物
+// ==========================
 function spawnFood() {
-    const isGood = Math.random() < 0.7; // 70% 甜食
+    let type = Math.random() < 0.75 ? "good" : "bad"; // 甜食 75%
+    let emoji = type === "good" 
+        ? sweetFoods[Math.floor(Math.random() * sweetFoods.length)]
+        : badFoods[Math.floor(Math.random() * badFoods.length)];
+
     foods.push({
         x: Math.random() * (canvas.width - 50),
-        y: -50,
+        y: -60,
         size: 50,
-        speed: fallSpeed,
-        good: isGood
+        type: type,
+        emoji: emoji
     });
 }
 
-// --------- 監聽鍵盤 ---------
-document.addEventListener("keydown", e => {
-    if (e.key === "ArrowLeft") cat.x -= cat.speed;
-    if (e.key === "ArrowRight") cat.x += cat.speed;
+// ==========================
+//      小貓移動控制
+// ==========================
+document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") {
+        cat.x -= cat.speed;
+    } else if (e.key === "ArrowRight") {
+        cat.x += cat.speed;
+    }
 
-    // 防止移出螢幕
-    cat.x = Math.max(0, Math.min(canvas.width - cat.size, cat.x));
+    // 邊界限制
+    cat.x = Math.max(0, Math.min(canvas.width - cat.width, cat.x));
 });
 
-// --------- 遊戲主迴圈 ---------
-function gameLoop() {
+// ==========================
+//      主遊戲迴圈
+// ==========================
+function gameLoop(timestamp) {
+
+    // 清空畫面
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    frameCount++;
-    if (frameCount % 40 === 0) spawnFood();
+    // 自動生成食物
+    if (timestamp - lastSpawn > spawnRate) {
+        spawnFood();
+        lastSpawn = timestamp;
+        fallSpeed += 0.03; // ★ 隨時間加快落下速度
+    }
 
-    // 落下速度隨時間變快
-    fallSpeed += 0.001;
+    // 繪製小貓
+    ctx.font = `${cat.width}px serif`;
+    ctx.fillText("🐱", cat.x, cat.y);
 
-    // 畫小貓
-    ctx.fillStyle = "#444";
-    ctx.beginPath();
-    ctx.arc(cat.x + cat.size / 2, cat.y + cat.size / 2, cat.size / 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 更新食物
+    // 更新食物位置
     for (let i = foods.length - 1; i >= 0; i--) {
         let f = foods[i];
-        f.y += f.speed;
+        f.y += fallSpeed;
 
-        // 畫食物
-        ctx.fillStyle = f.good ? "#ff6eb7" : "#555";
-        ctx.fillRect(f.x, f.y, f.size, f.size);
+        // 繪製食物
+        ctx.font = `${f.size}px serif`;
+        ctx.fillText(f.emoji, f.x, f.y);
 
-        // 碰撞檢查
+        // 碰撞判定
         if (
-            f.y + f.size >= cat.y &&
-            f.x + f.size >= cat.x &&
-            f.x <= cat.x + cat.size
+            f.y + f.size > cat.y &&
+            f.y < cat.y + cat.height &&
+            f.x + f.size > cat.x &&
+            f.x < cat.x + cat.width
         ) {
-            if (f.good) {
-                score += 100;
+            if (f.type === "good") {
+                score += 100; // ★ 甜食 +100
             } else {
-                life--;
+                life -= 1;
             }
             foods.splice(i, 1);
         }
 
-        // 掉出螢幕移除
-        if (f.y > canvas.height) foods.splice(i, 1);
+        // 超出畫面移除
+        if (f.y > canvas.height + 100) {
+            foods.splice(i, 1);
+        }
     }
 
-    // 更新 UI
-    document.getElementById("ui").innerText = `分數：${score}　|　生命：${life}`;
+    // UI：分數 & 生命
+    ctx.font = "30px Arial";
+    ctx.fillStyle = "#000";
+    ctx.fillText(`Score: ${score}`, 20, 40);
+    ctx.fillText(`Life: ${life}`, 20, 80);
 
-    // 遊戲結束
+    // Game Over
     if (life <= 0) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#fff";
-        ctx.font = "48px Arial";
-        ctx.fillText("Game Over", canvas.width / 2 - 120, canvas.height / 2);
+        ctx.font = "60px Arial";
+        ctx.fillStyle = "red";
+        ctx.fillText("Game Over", canvas.width / 2 - 150, canvas.height / 2);
         return;
     }
 
     requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
+requestAnimationFrame(gameLoop);
 </script>
+
+</body>
+</html>
+
 
 </body>
 </html>
