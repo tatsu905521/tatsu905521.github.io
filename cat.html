@@ -11,13 +11,11 @@
     }
     canvas {
         display: block;
-        margin: 0 auto;
         background: #fff7f0;
     }
 </style>
 </head>
 <body>
-
 <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -25,7 +23,6 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// 手機直向為主，但電腦也能玩
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -35,22 +32,21 @@ resize();
 
 // === 小貓設定 ===
 const catImg = new Image();
-catImg.src = "61ba6fdc-045c-4615-9b98-ba21901e27f1.png
-";  // ← 你的小貓圖片放這
+catImg.src = "61ba6fdc-045c-4615-9b98-ba21901e27f1.png";  // ← 修正：不能換行
 
 let cat = {
     x: canvas.width / 2,
     y: canvas.height - 150,
     size: 120,
-    speed: 15 // ← 已加快
+    speed: 15
 };
 
 // === 遊戲狀態 ===
 let score = 0;
-let life = 1; // ← 生命一次
+let life = 1;
 let foodList = [];
-let foodSpeed = 3; // 初始速度
-let spawnRate = 20; // 食物密度（數字越小越密）
+let foodSpeed = 3;
+let spawnRate = 15;
 let frame = 0;
 
 // === 生成食物 ===
@@ -75,26 +71,24 @@ function drawFood() {
     }
 }
 
-// === 移動 + 碰撞 ===
+// === 食物移動與碰撞 ===
 function updateFood() {
     for (let i = foodList.length - 1; i >= 0; i--) {
         let f = foodList[i];
         f.y += f.speed;
 
         // 碰到小貓
-        if (Math.abs(f.x - cat.x) < cat.size/2 &&
-            Math.abs(f.y - cat.y) < cat.size/2) {
+        if (
+            Math.abs(f.x - cat.x) < cat.size/2 &&
+            Math.abs(f.y - cat.y) < cat.size/2
+        ) {
+            if (f.good) score += 100;
+            else life -= 1;
 
-            if (f.good) {
-                score += 100;
-            } else {
-                life -= 1;
-            }
             foodList.splice(i, 1);
             continue;
         }
 
-        // 超出畫面移除
         if (f.y > canvas.height + 50) {
             foodList.splice(i, 1);
         }
@@ -118,23 +112,19 @@ function drawUI() {
 function gameLoop() {
     if (life <= 0) {
         ctx.fillStyle = "#000";
-        ctx.font = "50px sans-serif";
+        ctx.font = "48px sans-serif";
         ctx.fillText("遊戲結束！分數：" + score, canvas.width/2 - 150, canvas.height/2);
         return;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 每 15 frame 掉落一次
-    if (frame % spawnRate === 0) {
-        spawnFood();
-    }
+    if (frame % spawnRate === 0) spawnFood();
 
-    // 加速
     if (frame % 300 === 0) {
         foodSpeed += 0.4;
         cat.speed += 1;
-        if (spawnRate > 8) spawnRate -= 1;
+        if (spawnRate > 6) spawnRate -= 1;
     }
 
     updateFood();
@@ -145,19 +135,23 @@ function gameLoop() {
     frame++;
     requestAnimationFrame(gameLoop);
 }
+
 requestAnimationFrame(gameLoop);
 
-// === 電腦鍵盤控制 ===
+// === 電腦方向鍵控制 ===
 document.addEventListener("keydown", e => {
-    if (e.key === "ArrowLeft") cat.x -= cat.speed;
+    if (e.key === "ArrowLeft")  cat.x -= cat.speed;
     if (e.key === "ArrowRight") cat.x += cat.speed;
 });
 
-// === 手機觸控控制 ===
+// === 手機觸控 ===
 document.addEventListener("touchmove", e => {
     cat.x = e.touches[0].clientX;
 });
 </script>
+</body>
+</html>
+
 
 </body>
 </html>
