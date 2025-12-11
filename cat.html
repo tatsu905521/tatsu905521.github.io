@@ -1,356 +1,49 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>小貓接食物（貼圖版）</title>
-<style>
-  :root{
-    --bg1:#fff0f6;
-    --bg2:#fff7f0;
-    --panel:#fff;
-    --accent:#ff6b88;
-  }
-  html,body{height:100%;margin:0;font-family: "Noto Sans TC", system-ui, -apple-system;}
-  body{
-    background: linear-gradient(180deg,var(--bg1),var(--bg2));
-    display:flex;align-items:center;justify-content:center;
-  }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>喵的專屬網頁</title>
 
-  /* Canvas 直屏優先，電腦也能全螢幕 */
-  #gameWrap{
-    width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;position:relative;
-  }
-  canvas{
-    width:100%;height:100%;display:block;
-    border-radius:0;
-    image-rendering: optimizeQuality;
-  }
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: #f9f9f9;
+            text-align: center;
+            padding: 40px;
+        }
 
-  /* UI */
-  #uiTop{position:absolute;top:12px;left:12px;z-index:30;color:#333;font-weight:700;display:flex;gap:18px;align-items:center}
-  .stat{background: rgba(255,255,255,0.6);backdrop-filter: blur(4px);padding:8px 12px;border-radius:10px;font-size:16px}
-  #restartBtn{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;
-    padding:16px 28px;font-size:20px;border-radius:12px;border:none;background:var(--accent);color:white;
-    box-shadow:0 8px 20px rgba(0,0,0,0.15);cursor:pointer;display:none;
-  }
-  #startOverlay{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:35;
-    background:linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.25));
-    color:white;font-size:22px;flex-direction:column;gap:12px;
-  }
-  #startBtn{padding:12px 22px;border-radius:10px;border:none;background:var(--accent);color:white;font-weight:700}
-  /* 小提示：手機左右控制區 */
-  .touchHint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:12px}
-  .touchBtn{width:72px;height:56px;border-radius:12px;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;font-size:22px}
-</style>
+        h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .cat-img {
+            width: 300px;   /* 貓咪大小（你要大一點我可以幫調） */
+            height: 300px;
+            object-fit: cover;
+            border-radius: 50%;   /* 裁出只有貓咪的圓形區域 */
+        }
+
+        .emoji-line {
+            font-size: 36px;
+            margin: 20px 0;
+        }
+    </style>
 </head>
+
 <body>
-  <div id="gameWrap" aria-label="小貓接食物遊戲">
-    <canvas id="game"></canvas>
 
-    <div id="uiTop" aria-hidden="true">
-      <div class="stat" id="scoreUI">分數：0</div>
-      <div class="stat" id="lifeUI">生命：1</div>
-    </div>
+    <h1>🐾 喵的可愛貓咪專區 🐾</h1>
 
-    <div class="touchHint" aria-hidden="true">
-      <div class="touchBtn" id="leftTouch">◀</div>
-      <div class="touchBtn" id="rightTouch">▶</div>
-    </div>
+    <div class="emoji-line">😺✨💛🐈💫🌟</div>
 
-    <button id="restartBtn">重新開始</button>
+    <!-- 這裡放你的貓咪圖片（透明 PNG 更好） -->
+    <img src="你的圖片連結.png" class="cat-img">
 
-    <div id="startOverlay">
-      <div style="font-size:28px;font-weight:800">🐱 小貓接食物</div>
-      <div style="opacity:0.9">用方向鍵或點左/右控制小貓接甜食（甜食 +100，撞到壞物結束）</div>
-      <button id="startBtn">開始遊戲</button>
-    </div>
-  </div>
+    <div class="emoji-line">🌸😼💖🐾🍀🌙</div>
 
-<script>
-(() => {
-  // DOM
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d', { alpha: true });
-  const gameWrap = document.getElementById('gameWrap');
-  const restartBtn = document.getElementById('restartBtn');
-  const scoreUI = document.getElementById('scoreUI');
-  const lifeUI = document.getElementById('lifeUI');
-  const startOverlay = document.getElementById('startOverlay');
-  const startBtn = document.getElementById('startBtn');
-  const leftTouch = document.getElementById('leftTouch');
-  const rightTouch = document.getElementById('rightTouch');
-
-  // resize canvas to device pixel ratio for crispness
-  function resize(){
-    const dpr = window.devicePixelRatio || 1;
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  // --- resources ---
-  const catImg = new Image();
-  // your PNG filename (must be placed in same folder as index.html)
-  catImg.src = "61ba6fdc-045c-4615-9b98-ba21901e27f1.png";
-
-  // emoji collections
-  const goodEmojis = ["🍰","🧁","🍭","🍩","🍪","🍓","🍫","🍦"];
-  const badEmojis  = ["🗑️","💣","🪨","⚙️","🧨","🧱"];
-
-  // game state
-  let running = false;
-  let score = 0;
-  let life = 1;
-  let foods = []; // {x,y,size,speed,good,emoji}
-  let spawnTimer = 0;
-  let spawnInterval = 600; // ms - will reduce for density
-  let lastTs = 0;
-  let fallBase = 120; // px/sec
-  let speedMultiplier = 1;
-  let cat = { x: 0, y: 0, drawW: 200, drawH: 200, speed: 520 }; // speed in px/sec (fast)
-  let keys = { left:false, right:false };
-  let touchLeft = false, touchRight = false;
-
-  // helpers
-  function rand(min,max){ return Math.random()*(max-min)+min; }
-
-  // start/reset
-  function resetState(){
-    score = 0;
-    life = 1;
-    foods = [];
-    spawnInterval = 500; // more dense
-    fallBase = 160;
-    speedMultiplier = 1;
-    spawnTimer = 0;
-    lastTs = 0;
-    running = false;
-    // set cat position (centered horizontally, near bottom)
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    cat.x = w/2;
-    cat.y = h - Math.min(200, Math.round(h*0.18)); // slightly above bottom
-    // compute draw size after image loaded (maintain aspect)
-    if (catImg.naturalWidth && catImg.naturalHeight){
-      const aspect = catImg.naturalWidth / catImg.naturalHeight;
-      cat.drawW = Math.min(260, Math.round(Math.min(w*0.28, 260)));
-      cat.drawH = Math.round(cat.drawW / aspect);
-    }
-    updateUI();
-  }
-
-  function updateUI(){
-    scoreUI.textContent = "分數：" + score;
-    lifeUI.textContent = "生命：" + life;
-  }
-
-  // spawn food
-  function spawn(){
-    // density control: if spawnInterval small, more frequent
-    const w = canvas.clientWidth;
-    const size = Math.round(rand(44,72));
-    const good = Math.random() < 0.72;
-    const emoji = good ? goodEmojis[Math.floor(Math.random()*goodEmojis.length)]
-                       : badEmojis[Math.floor(Math.random()*badEmojis.length)];
-    foods.push({
-      x: rand(size/2, w - size/2),
-      y: -size,
-      size,
-      speed: fallBase * (0.9 + Math.random()*0.6) * speedMultiplier / 1000, // px per ms
-      good,
-      emoji
-    });
-  }
-
-  // input
-  window.addEventListener('keydown', e=>{
-    if (e.key === 'ArrowLeft') keys.left = true;
-    if (e.key === 'ArrowRight') keys.right = true;
-  });
-  window.addEventListener('keyup', e=>{
-    if (e.key === 'ArrowLeft') keys.left = false;
-    if (e.key === 'ArrowRight') keys.right = false;
-  });
-
-  // touch / buttons (left/right)
-  leftTouch.addEventListener('touchstart', e => { e.preventDefault(); touchLeft = true; });
-  leftTouch.addEventListener('touchend', e => { e.preventDefault(); touchLeft = false; });
-  rightTouch.addEventListener('touchstart', e => { e.preventDefault(); touchRight = true; });
-  rightTouch.addEventListener('touchend', e => { e.preventDefault(); touchRight = false; });
-
-  // allow dragging / direct touch move
-  canvas.addEventListener('touchmove', e=>{
-    e.preventDefault();
-    if (e.touches && e.touches[0]) {
-      const tx = e.touches[0].clientX;
-      cat.x = tx;
-    }
-  }, { passive:false });
-
-  // collision check (approx by circle-box)
-  function hitCat(food){
-    // treat cat as rectangle centered at cat.x, cat.y
-    const catW = cat.drawW, catH = cat.drawH;
-    const dx = Math.abs(food.x - cat.x);
-    const dy = Math.abs(food.y - cat.y + catH*0.08); // small vertical offset
-    return (dx < (catW/2 + food.size*0.4)) && (dy < (catH/2 + food.size*0.4));
-  }
-
-  // draw background (to avoid white seams)
-  function drawBackground(){
-    const w = canvas.width, h = canvas.height;
-    // subtle gradient fill
-    const g = ctx.createLinearGradient(0,0,0,canvas.clientHeight);
-    g.addColorStop(0,'#fff6f9');
-    g.addColorStop(1,'#fffbe8');
-    ctx.fillStyle = g;
-    ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
-    // optional ground strip
-    ctx.fillStyle = 'rgba(255,240,245,0.55)';
-    ctx.fillRect(0, canvas.clientHeight - Math.min(140, canvas.clientHeight*0.14), canvas.clientWidth, Math.min(140, canvas.clientHeight*0.14));
-  }
-
-  // draw all foods
-  function drawFoods(){
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const f of foods){
-      ctx.font = `${f.size}px serif`;
-      ctx.fillText(f.emoji, f.x, f.y);
-    }
-  }
-
-  // draw cat using original aspect ratio (no stretching)
-  function drawCat(){
-    if (catImg.naturalWidth && catImg.naturalHeight){
-      const aspect = catImg.naturalWidth / catImg.naturalHeight;
-      const drawW = cat.drawW;
-      const drawH = Math.round(drawW / aspect);
-      ctx.drawImage(catImg, cat.x - drawW/2, cat.y - drawH/2, drawW, drawH);
-    } else {
-      // fallback: emoji cat
-      ctx.font = `${cat.drawW}px serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline='middle';
-      ctx.fillText('🐱', cat.x, cat.y);
-    }
-  }
-
-  // main loop (time-based)
-  function loop(ts){
-    if (!lastTs) lastTs = ts;
-    const dt = ts - lastTs;
-    lastTs = ts;
-
-    // input movement
-    const move = (cat.speed * dt) / 1000; // px per frame based on dt
-    if (keys.left || touchLeft) cat.x -= move;
-    if (keys.right || touchRight) cat.x += move;
-
-    // clamp inside canvas
-    const pad = Math.max(40, cat.drawW/2);
-    cat.x = Math.max(pad, Math.min(canvas.clientWidth - pad, cat.x));
-
-    // spawn logic
-    spawnTimer += dt;
-    // spawn more frequently when density higher
-    if (spawnTimer >= spawnInterval){
-      spawn(); spawnTimer = 0;
-      // small chance spawn an extra one to increase density
-      if (Math.random() < 0.35) spawn();
-    }
-
-    // update foods
-    for (let i = foods.length -1; i >=0; i--){
-      const f = foods[i];
-      f.y += f.speed * dt; // speed px/ms
-      // if hit
-      if (hitCat(f)){
-        if (f.good) score += 100;
-        else life -= 1;
-        foods.splice(i,1);
-        updateUI();
-        if (life <= 0){ running = false; showGameOver(); return; }
-      } else if (f.y - f.size > canvas.clientHeight + 40){
-        foods.splice(i,1);
-      }
-    }
-
-    // difficulty scaling slowly
-    speedMultiplier += dt * 0.00002;
-    if (frame % 600 === 0 && spawnInterval > 140) spawnInterval -= 6;
-
-    // drawing (clear + background)
-    drawBackground();
-    drawFoods();
-    drawCat();
-
-    frame++;
-    if (running) requestAnimationFrame(loop);
-  }
-
-  function showGameOver(){
-    // draw final overlay
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
-    ctx.fillStyle = "white";
-    ctx.font = "42px sans-serif";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(`遊戲結束！分數：${score}`, canvas.clientWidth/2, canvas.clientHeight/2 - 30);
-    restartBtn.style.display = 'block';
-  }
-
-  // restart handler
-  restartBtn.addEventListener('click', ()=>{
-    restartBtn.style.display = 'none';
-    startOverlay.style.display = 'flex';
-    resetState();
-  });
-
-  // start handler
-  startBtn.addEventListener('click', ()=>{
-    startOverlay.style.display = 'none';
-    startGame();
-  });
-
-  // start game
-  function startGame(){
-    if (!catImg.complete){
-      // wait for image
-      catImg.onload = ()=>{ afterImageReady(); };
-      catImg.onerror = ()=>{
-        console.warn('cat image failed to load — will use emoji fallback');
-        afterImageReady();
-      };
-    } else afterImageReady();
-  }
-
-  function afterImageReady(){
-    resetState();
-    running = true;
-    lastTs = 0;
-    requestAnimationFrame(loop);
-  }
-
-  // initial prepare
-  let frame = 0;
-  resetState();
-
-  // prevent default page scroll on touch
-  document.addEventListener('touchmove', e => { if (running) e.preventDefault(); }, { passive:false });
-
-  // quick keyboard listeners to stop auto-repeat issues (arrow hold)
-  window.addEventListener('blur', ()=>{ keys.left=false; keys.right=false; touchLeft=false; touchRight=false; });
-
-})();
-</script>
 </body>
 </html>
+
 
