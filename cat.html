@@ -206,19 +206,10 @@ cat.drawH = Math.round(cat.drawW / aspect);
   }
 
   // draw background (to avoid white seams)
-  function drawBackground(){
-    const w = canvas.width, h = canvas.height;
-    // subtle gradient fill
-    const g = ctx.createLinearGradient(0,0,0,canvas.clientHeight);
-    g.addColorStop(0,'#fff6f9');
-    g.addColorStop(1,'#fffbe8');
-    ctx.fillStyle = g;
-    ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
-    // optional ground strip
-    ctx.fillStyle = 'rgba(255,240,245,0.55)';
-    ctx.fillRect(0, canvas.clientHeight - Math.min(140, canvas.clientHeight*0.14), canvas.clientWidth, Math.min(140, canvas.clientHeight*0.14));
-  }
-
+ function drawBackground(){
+  ctx.fillStyle = '#ffffff';   // 純白
+  ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+}
   // draw all foods
   function drawFoods(){
     ctx.textAlign = 'center';
