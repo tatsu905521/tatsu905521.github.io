@@ -100,7 +100,7 @@
   // --- resources ---
   const catImg = new Image();
   // your PNG filename (must be placed in same folder as index.html)
-  catImg.src = "12869327-2e01-4110-8d44-8bc8f49883ca.png";
+  catImg.src = "bb4307a5-8b3a-4983-a381-7dee8591e907.png";
 
   // emoji collections
   const goodEmojis = ["🍰","🧁","🍭","🍩","🍪","🍓","🍫","🍦"];
@@ -142,7 +142,7 @@
     // compute draw size after image loaded (maintain aspect)
     if (catImg.naturalWidth && catImg.naturalHeight){
       const aspect = catImg.naturalWidth / catImg.naturalHeight;
-     cat.drawW = 180;   // ← 想多小就改這
+     cat.drawW = 90;   // ← 想多小就改這
 cat.drawH = Math.round(cat.drawW / aspect);
     }
     updateUI();
