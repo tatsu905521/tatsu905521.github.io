@@ -142,8 +142,8 @@
     // compute draw size after image loaded (maintain aspect)
     if (catImg.naturalWidth && catImg.naturalHeight){
       const aspect = catImg.naturalWidth / catImg.naturalHeight;
-      cat.drawW = Math.min(260, Math.round(Math.min(w*0.28, 260)));
-      cat.drawH = Math.round(cat.drawW / aspect);
+     cat.drawW = 180;   // ← 想多小就改這
+cat.drawH = Math.round(cat.drawW / aspect);
     }
     updateUI();
   }
